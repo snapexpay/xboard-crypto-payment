@@ -1,0 +1,8 @@
+{
+    "name": "SnapEX Pay",
+    "code": "snapexpay",
+    "type": "payment",
+    "version": "1.2.0",
+    "description": "Crypto payments for Xboard and V2Board: USDT on TRC20/ERC20/BEP20/Solana/TON and more, and other coins via SnapEX Pay.",
+    "author": "SnapEX"
+}
