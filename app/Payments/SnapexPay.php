@@ -142,12 +142,16 @@ class SnapexPay
         if (! is_array($event)) {
             return false;
         }
-        $invoiceId = (string) ($event['data']['invoice_id'] ?? '');
-        $type = (string) ($event['type'] ?? '');
-        if ($invoiceId === '' || strpos($type, 'invoice.') !== 0) {
+        $type = is_string($event['type'] ?? null) ? $event['type'] : '';
+        if ($type === '') {
             return false;
         }
-        if ($type !== 'invoice.paid' && ($event['data']['status'] ?? '') !== 'paid') {
+        if (strpos($type, 'invoice.') !== 0 || ($type !== 'invoice.paid' && ($event['data']['status'] ?? '') !== 'paid')) {
+            // Signed, but cannot open an order (balance.changed, payment.credited, invoice.created, …): answer 200.
+            throw self::acknowledged($type);
+        }
+        $invoiceId = (string) ($event['data']['invoice_id'] ?? '');
+        if ($invoiceId === '') {
             return false;
         }
         list($status, $decoded) = $this->send('GET', '/invoices/'.rawurlencode($invoiceId));
@@ -169,6 +173,36 @@ class SnapexPay
             'trade_no' => $tradeNo,
             'callback_no' => $invoiceId,
         ];
+    }
+
+    /**
+     * The panel answers an error to every notify() that returns false, and SnapEX retries money events after it.
+     * The controller catches only \Exception, so this \Error reaches Laravel's handler, which renders a
+     * Responsable as is: 200 {"ok":true,"ignored":"<type>"}.
+     */
+    public static function acknowledged(string $type): \Error
+    {
+        return new class($type) extends \Error implements \Illuminate\Contracts\Support\Responsable
+        {
+            public $type;
+
+            public function __construct(string $type)
+            {
+                parent::__construct('SnapEX Pay event '.$type.' needs no action');
+                $this->type = $type;
+            }
+
+            public function toResponse($request)
+            {
+                return new \Illuminate\Http\JsonResponse(['ok' => true, 'ignored' => $this->type]);
+            }
+
+            /** Not an error: keep it out of the log. */
+            public function report(): bool
+            {
+                return true;
+            }
+        };
     }
 
     private function environment(): string
@@ -228,7 +262,7 @@ class SnapexPay
         $headers = array_merge([
             'Authorization: Bearer '.$apiKey,
             'Accept: application/json',
-            'User-Agent: SnapEX-Pay-V2Board/1.2.0',
+            'User-Agent: SnapEX-Pay-V2Board/1.3.0',
         ], $extraHeaders);
         $json = null;
         if ($payload !== null) {

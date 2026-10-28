@@ -53,15 +53,15 @@ The plugin code is `snapexpay`, so Xboard looks for it in **`plugins/Snapexpay/`
 
 Option A, upload:
 
-1. Download the archive [snapexpay-xboard-1.2.0.zip](https://pay.snapex.pro/downloads/xboard/snapexpay-xboard-1.2.0.zip) (it must contain `config.json` and `Plugin.php`, either at the root or inside one top-level folder).
+1. Download the archive [snapexpay-xboard-1.3.0.zip](https://pay.snapex.pro/downloads/xboard/snapexpay-xboard-1.3.0.zip) (it must contain `config.json` and `Plugin.php`, either at the root or inside one top-level folder).
 2. Xboard admin → **Plugins** → upload the ZIP → **Install** → **Enable** "SnapEX Pay".
 
 Option B, copy the files:
 
 ```bash
 cd /path/to/Xboard            # with Docker Compose this is the folder that has ./plugins mounted to /www/plugins
-curl -fsSLO https://pay.snapex.pro/downloads/xboard/snapexpay-xboard-1.2.0.zip && unzip snapexpay-xboard-1.2.0.zip
-mv snapexpay-xboard-1.2.0 plugins/Snapexpay
+curl -fsSLO https://pay.snapex.pro/downloads/xboard/snapexpay-xboard-1.3.0.zip && unzip snapexpay-xboard-1.3.0.zip
+mv snapexpay-xboard-1.3.0 plugins/Snapexpay
 ```
 
 Then in the admin: **Plugins** → **Install** → **Enable** "SnapEX Pay".
@@ -77,8 +77,8 @@ After the plugin is enabled:
 1. Copy [`app/Payments/SnapexPay.php`](app/Payments/SnapexPay.php) into your panel as **`app/Payments/SnapexPay.php`**:
 
    ```bash
-   curl -fsSLO https://pay.snapex.pro/downloads/xboard/snapexpay-xboard-1.2.0.zip
-   unzip -p snapexpay-xboard-1.2.0.zip snapexpay-xboard-1.2.0/app/Payments/SnapexPay.php > /path/to/v2board/app/Payments/SnapexPay.php
+   curl -fsSLO https://pay.snapex.pro/downloads/xboard/snapexpay-xboard-1.3.0.zip
+   unzip -p snapexpay-xboard-1.3.0.zip snapexpay-xboard-1.3.0/app/Payments/SnapexPay.php > /path/to/v2board/app/Payments/SnapexPay.php
    ```
 
 2. If you use OPcache or Octane, restart PHP-FPM / Octane so the new class is picked up.
@@ -116,7 +116,7 @@ https://your-panel.example/api/v1/guest/payment/notify/SnapexPay/{uuid}
 In the [SnapEX Pay cabinet](https://snapex.pro):
 
 1. Set this URL as the account's webhook URL. It must be public HTTPS.
-2. The cabinet has one webhook URL per account and sends it every event. Only **`invoice.paid`** opens an order; other events are signed and verified but the panel answers them with an error (`422 verify error` on Xboard, `500` on V2Board), which only shows up as a failed delivery in the SnapEX log.
+2. The cabinet has one webhook URL per account and sends it every event. Only **`invoice.paid`** opens an order; other events are signed and verified and answered `200 {"ok":true,"ignored":"<type>"}` with nothing changed.
 3. Copy the `whsec_…` secret into the **Webhook secret** field of the payment method.
 
 The plugin verifies:

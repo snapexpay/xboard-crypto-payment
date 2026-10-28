@@ -151,6 +151,25 @@ namespace Illuminate\Http {
     }
 }
 
+namespace Illuminate\Contracts\Support {
+    interface Responsable
+    {
+        public function toResponse($request);
+    }
+}
+
+namespace Illuminate\Http {
+    class JsonResponse
+    {
+        public function __construct(public $data = [], public int $status = 200) {}
+
+        public function getStatusCode(): int
+        {
+            return $this->status;
+        }
+    }
+}
+
 namespace Symfony\Component\HttpKernel\Exception {
     class HttpException extends \RuntimeException
     {
@@ -202,6 +221,24 @@ namespace {
             'Webhook-Timestamp' => $ts,
             'Webhook-Signature' => $sig ?? 'v1='.hash_hmac('sha256', $ts.'.'.$body, $secret),
         ]);
+    }
+
+    /** What Laravel renders for a Throwable that escapes the panel's catch (\Exception): [status, body] or null. */
+    function acknowledged(callable $fn): ?array
+    {
+        try {
+            $fn();
+        } catch (\Exception $e) {
+            return null; // the panel's controller would catch it → error
+        } catch (Throwable $e) {
+            if ($e instanceof Illuminate\Contracts\Support\Responsable) {
+                $r = $e->toResponse(null);
+
+                return [$r->getStatusCode(), $r->data, method_exists($e, 'report') ? $e->report() : null];
+            }
+        }
+
+        return null;
     }
 
     function throws(callable $fn): ?Throwable
@@ -360,13 +397,25 @@ namespace {
     $GLOBALS['request'] = signed('whsec_dummy', ['type' => 'invoice.paid', 'data' => ['invoice_id' => $openId, 'status' => 'paid']]);
     check($plugin->notify([]) === false, 'webhook says paid but API says open → rejected');
     $GLOBALS['request'] = signed('whsec_dummy', ['type' => 'invoice.partially_paid', 'data' => ['invoice_id' => $paidId, 'status' => 'partially_paid']]);
-    check($plugin->notify([]) === false, 'invoice.partially_paid does not pay the order');
+    check(acknowledged(fn () => $plugin->notify([]))[0] === 200, 'invoice.partially_paid does not pay the order, answered 200');
     $GLOBALS['request'] = signed('whsec_dummy', ['type' => 'invoice.created', 'data' => ['invoice_id' => $paidId, 'status' => 'open']]);
-    check($plugin->notify([]) === false, 'invoice.created ignored');
+    check(acknowledged(fn () => $plugin->notify([])) === [200, ['ok' => true, 'ignored' => 'invoice.created'], true], 'invoice.created → 200 {ok, ignored}, not logged');
     $GLOBALS['request'] = signed('whsec_dummy', ['type' => 'invoice.paid', 'data' => ['invoice_id' => 'INV-NOPE']]);
     check($plugin->notify([]) === false, 'unknown invoice rejected');
     $GLOBALS['request'] = signed('whsec_dummy', ['type' => 'payment.credited', 'data' => ['invoice_id' => $paidId, 'status' => 'paid']]);
-    check($plugin->notify([]) === false, 'non-invoice event ignored');
+    check(acknowledged(fn () => $plugin->notify([]))[1] === ['ok' => true, 'ignored' => 'payment.credited'], 'payment.credited → 200 ignored (not 422: SnapEX retries money events)');
+    foreach (['balance.changed' => ['amount_usd' => '1.00'], 'payout.completed' => ['payout_id' => 'PO-1'], 'invoice.expired' => ['invoice_id' => $paidId, 'status' => 'expired']] as $t => $data) {
+        $GLOBALS['request'] = signed('whsec_dummy', ['type' => $t, 'data' => $data]);
+        check(acknowledged(fn () => $plugin->notify([]))[0] === 200, $t.' → 200 ignored');
+    }
+    $GLOBALS['request'] = signed('whsec_other', ['type' => 'balance.changed', 'data' => []]);
+    check($plugin->notify([]) === false, 'unhandled event with a wrong signature is still rejected (signature checked first)');
+    $GLOBALS['request'] = signed('whsec_dummy', ['type' => 'balance.changed', 'data' => []], time() - 301);
+    check($plugin->notify([]) === false, 'unhandled event with a stale timestamp is still rejected');
+    $GLOBALS['request'] = signed('whsec_dummy', ['data' => ['invoice_id' => $paidId, 'status' => 'paid']]);
+    check($plugin->notify([]) === false, 'event without type rejected');
+    $GLOBALS['request'] = signed('whsec_dummy', ['type' => 'invoice.paid', 'data' => ['status' => 'paid']]);
+    check($plugin->notify([]) === false, 'invoice.paid without invoice_id rejected');
 
     $live = new Plugin\Snapexpay\Plugin('snapexpay');
     $live->setConfig(['environment' => 'live'] + $cfg);
@@ -424,6 +473,12 @@ namespace {
     check((new App\Payments\SnapexPay(['environment' => 'live'] + $cfg))->notify([]) === false, 'test invoice cannot pay a live method');
     $GLOBALS['request'] = signed('whsec_dummy', ['type' => 'invoice.paid', 'data' => ['invoice_id' => $openId]]);
     check($v2->notify([]) === false, 'API status open → rejected');
+    $GLOBALS['request'] = signed('whsec_dummy', ['type' => 'payment.credited', 'data' => ['invoice_id' => $paid2, 'status' => 'paid']]);
+    check(acknowledged(fn () => $v2->notify([])) === [200, ['ok' => true, 'ignored' => 'payment.credited'], true], 'payment.credited → 200 {ok, ignored}');
+    $GLOBALS['request'] = signed('whsec_dummy', ['type' => 'invoice.created', 'data' => ['invoice_id' => $paid2, 'status' => 'open']]);
+    check(acknowledged(fn () => $v2->notify([]))[0] === 200, 'invoice.created → 200 ignored');
+    $GLOBALS['request'] = signed('whsec_bad', ['type' => 'balance.changed', 'data' => []]);
+    check($v2->notify([]) === false, 'unhandled event with a wrong signature is still rejected');
 
     echo $failures === 0 ? "\nAll tests passed.\n" : "\n{$failures} test(s) failed.\n";
     exit($failures === 0 ? 0 : 1);

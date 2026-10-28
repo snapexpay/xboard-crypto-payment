@@ -5,6 +5,8 @@ namespace Plugin\Snapexpay;
 use App\Contracts\PaymentInterface;
 use App\Exceptions\ApiException;
 use App\Services\Plugin\AbstractPlugin;
+use Illuminate\Contracts\Support\Responsable;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
@@ -180,12 +182,16 @@ class Plugin extends AbstractPlugin implements PaymentInterface
             return false;
         }
 
-        $type = (string) ($event['type'] ?? '');
-        $invoiceId = (string) ($event['data']['invoice_id'] ?? '');
-        if ($invoiceId === '' || ! str_starts_with($type, 'invoice.')) {
+        $type = is_string($event['type'] ?? null) ? $event['type'] : '';
+        if ($type === '') {
             return false;
         }
-        if ($type !== 'invoice.paid' && ($event['data']['status'] ?? '') !== 'paid') {
+        if (! str_starts_with($type, 'invoice.') || ($type !== 'invoice.paid' && ($event['data']['status'] ?? '') !== 'paid')) {
+            // Signed, but cannot open an order (balance.changed, payment.credited, invoice.created, …): answer 200.
+            throw self::acknowledged($type);
+        }
+        $invoiceId = (string) ($event['data']['invoice_id'] ?? '');
+        if ($invoiceId === '') {
             return false;
         }
 
@@ -212,6 +218,33 @@ class Plugin extends AbstractPlugin implements PaymentInterface
             'callback_no' => $invoiceId,
             'custom_result' => 'success',
         ];
+    }
+
+    /**
+     * Xboard answers 422 to every notify() that returns false, and SnapEX retries money events after a 4xx.
+     * The controller catches only \Exception, so this \Error reaches Laravel's handler, which renders a
+     * Responsable as is: 200 {"ok":true,"ignored":"<type>"}. Works on every Xboard version, no hook needed.
+     */
+    public static function acknowledged(string $type): \Error
+    {
+        return new class($type) extends \Error implements Responsable
+        {
+            public function __construct(public readonly string $type)
+            {
+                parent::__construct('SnapEX Pay event '.$type.' needs no action');
+            }
+
+            public function toResponse($request)
+            {
+                return new JsonResponse(['ok' => true, 'ignored' => $this->type]);
+            }
+
+            /** Not an error: keep it out of the log. */
+            public function report(): bool
+            {
+                return true;
+            }
+        };
     }
 
     private function tradeNo(string $externalId): string
@@ -285,7 +318,7 @@ class Plugin extends AbstractPlugin implements PaymentInterface
         $headers = array_merge([
             'Authorization: Bearer '.$apiKey,
             'Accept: application/json',
-            'User-Agent: SnapEX-Pay-Xboard/1.2.0',
+            'User-Agent: SnapEX-Pay-Xboard/1.3.0',
         ], $extraHeaders);
         $this->lastStatus = 0;
         $json = null;

@@ -53,15 +53,15 @@ SnapEX Pay ── POST notify URL (Webhook-Signature) ──▶ notify() пла�
 
 Вариант А, загрузка архива:
 
-1. Скачайте архив [snapexpay-xboard-1.2.0.zip](https://pay.snapex.pro/downloads/xboard/snapexpay-xboard-1.2.0.zip) (в нём должны быть `config.json` и `Plugin.php`, в корне или в одной папке верхнего уровня).
+1. Скачайте архив [snapexpay-xboard-1.3.0.zip](https://pay.snapex.pro/downloads/xboard/snapexpay-xboard-1.3.0.zip) (в нём должны быть `config.json` и `Plugin.php`, в корне или в одной папке верхнего уровня).
 2. Админка Xboard → **Плагины** → загрузить ZIP → **Установить** → **Включить** «SnapEX Pay».
 
 Вариант Б, копирование файлов:
 
 ```bash
 cd /path/to/Xboard            # в Docker Compose это папка, где ./plugins смонтирована в /www/plugins
-curl -fsSLO https://pay.snapex.pro/downloads/xboard/snapexpay-xboard-1.2.0.zip && unzip snapexpay-xboard-1.2.0.zip
-mv snapexpay-xboard-1.2.0 plugins/Snapexpay
+curl -fsSLO https://pay.snapex.pro/downloads/xboard/snapexpay-xboard-1.3.0.zip && unzip snapexpay-xboard-1.3.0.zip
+mv snapexpay-xboard-1.3.0 plugins/Snapexpay
 ```
 
 Затем в админке: **Плагины** → **Установить** → **Включить** «SnapEX Pay».
@@ -77,8 +77,8 @@ mv snapexpay-xboard-1.2.0 plugins/Snapexpay
 1. Скопируйте [`app/Payments/SnapexPay.php`](app/Payments/SnapexPay.php) в панель как **`app/Payments/SnapexPay.php`**:
 
    ```bash
-   curl -fsSLO https://pay.snapex.pro/downloads/xboard/snapexpay-xboard-1.2.0.zip
-   unzip -p snapexpay-xboard-1.2.0.zip snapexpay-xboard-1.2.0/app/Payments/SnapexPay.php > /path/to/v2board/app/Payments/SnapexPay.php
+   curl -fsSLO https://pay.snapex.pro/downloads/xboard/snapexpay-xboard-1.3.0.zip
+   unzip -p snapexpay-xboard-1.3.0.zip snapexpay-xboard-1.3.0/app/Payments/SnapexPay.php > /path/to/v2board/app/Payments/SnapexPay.php
    ```
 
 2. Если включены OPcache или Octane, перезапустите PHP-FPM / Octane.
@@ -116,7 +116,7 @@ https://your-panel.example/api/v1/guest/payment/notify/SnapexPay/{uuid}
 В [кабинете SnapEX Pay](https://snapex.pro):
 
 1. Создайте вебхук с этим адресом. Он должен быть публичным и с HTTPS.
-2. Подпишите его на **`invoice.paid`**. Другие события проходят проверку подписи, но заказ не открывают; панель отвечает на них ошибкой (`422 verify error` в Xboard, `500` в V2Board), в журнале SnapEX это видно как неуспешная доставка.
+2. Кабинет шлёт на этот адрес все события аккаунта. Заказ открывает только **`invoice.paid`**; остальные события проходят проверку подписи, и панель отвечает на них `200 {"ok":true,"ignored":"<тип>"}`, ничего не меняя.
 3. Скопируйте секрет `whsec_…` в поле **Webhook secret** способа оплаты.
 
 Плагин проверяет:

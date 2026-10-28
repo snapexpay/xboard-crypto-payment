@@ -28,8 +28,8 @@
 
 插件代码为 `snapexpay`，Xboard 从 **`plugins/Snapexpay/`** 加载（Linux 下区分大小写）。
 
-- 上传：下载 ZIP 包 https://pay.snapex.pro/downloads/xboard/snapexpay-xboard-1.2.0.zip（包内需含 `config.json` 和 `Plugin.php`），后台 → **插件** → 上传 → 安装 → 启用「SnapEX Pay」。
-- 或复制：`curl -fsSLO https://pay.snapex.pro/downloads/xboard/snapexpay-xboard-1.2.0.zip && unzip snapexpay-xboard-1.2.0.zip && mv snapexpay-xboard-1.2.0 plugins/Snapexpay`，然后在后台安装并启用。
+- 上传：下载 ZIP 包 https://pay.snapex.pro/downloads/xboard/snapexpay-xboard-1.3.0.zip（包内需含 `config.json` 和 `Plugin.php`），后台 → **插件** → 上传 → 安装 → 启用「SnapEX Pay」。
+- 或复制：`curl -fsSLO https://pay.snapex.pro/downloads/xboard/snapexpay-xboard-1.3.0.zip && unzip snapexpay-xboard-1.3.0.zip && mv snapexpay-xboard-1.3.0 plugins/Snapexpay`，然后在后台安装并启用。
 
 之后：**支付配置** → **添加支付方式** → 网关 **SnapexPay**，填写下表字段并保存。
 
@@ -56,7 +56,7 @@
 https://your-panel.example/api/v1/guest/payment/notify/SnapexPay/{uuid}
 ```
 
-在 SnapEX Pay 控制台创建指向该地址的 Webhook（必须是公网 HTTPS），订阅 **`invoice.paid`**，并把 `whsec_…` 填入 **Webhook secret**。签名格式：`Webhook-Signature: v1=HMAC-SHA256(secret, "{Webhook-Timestamp}.{原始请求体}")`，时间误差需在 ±300 秒内。部分支付（`invoice.partially_paid`）不会开通订单。
+在 SnapEX Pay 控制台创建指向该地址的 Webhook（必须是公网 HTTPS），订阅 **`invoice.paid`**，并把 `whsec_…` 填入 **Webhook secret**。签名格式：`Webhook-Signature: v1=HMAC-SHA256(secret, "{Webhook-Timestamp}.{原始请求体}")`，时间误差需在 ±300 秒内。部分支付（`invoice.partially_paid`）不会开通订单。控制台会把账户的所有事件都发到该地址：只有 `invoice.paid` 会开通订单，其余已验签的事件返回 `200 {"ok":true,"ignored":"<type>"}`，不做任何改动。
 
 ## 测试
 
