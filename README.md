@@ -23,6 +23,7 @@ A payment plugin for the [Xboard](https://github.com/cedar2025/Xboard) and [V2Bo
 - Idempotent invoice creation (`Idempotency-Key`), so a repeated click on "Pay" reuses the same invoice. If the invoice has expired, a fresh one is opened for the same order.
 - The payment window is capped below the panel's own order timeout, so a customer can't pay an order that the panel already cancelled.
 - No extra dependencies: plain PHP and cURL.
+- Besides crypto, two more payment methods can be turned on for your SnapEX Pay account on request: Russian rubles by QR code (Russia) and Alipay. Ask us in the chat on [pay.snapex.pro](https://pay.snapex.pro).
 
 ## How it works
 
